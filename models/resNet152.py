@@ -1,20 +1,28 @@
-from torch.nn import Module, ModuleList, ReLU, Conv2d, MaxPool2d
+from torch import flatten
+from torch.nn import Module, ModuleList, ReLU, Conv2d, MaxPool2d, Linear
 
 class ResNet152(Module):
     """
     Class to create ResNet152 model
     https://cv-tricks.com/keras/understand-implement-resnets/
     """
-    def __init__(self):
+    def __init__(self, sizeInput=[3, 32, 32], sizeOutput=4):
         """
         Constructor
+
+        sizeInput : Array 3 elements
+        sizeOutput : size output to define last layer
         """
         super(ResNet152, self).__init__()
+        inputLastLayer = int(((sizeInput[1] / 4) - 2) * ((sizeInput[2] / 4) - 2) * 2048)
+        outputLastLayer = int(sizeOutput)
+
         self.layersInput = ModuleList()
         self.layersStage1 = ModuleList()
         self.layersStage2 = ModuleList()
         self.layersStage3 = ModuleList()
         self.layersStage4 = ModuleList()
+        self.lastLayer = ModuleList()
         self.projectionsIndentiyConnection = ModuleList()
 
         self.reLu = ReLU()
@@ -47,6 +55,8 @@ class ResNet152(Module):
             self.layersStage4.append(Conv2d(in_channels=2048, out_channels=512, kernel_size=1, stride=1))
             self.layersStage4.append(Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1))
             self.layersStage4.append(Conv2d(in_channels=512, out_channels=2048, kernel_size=1, stride=1))
+
+        self.lastLayer.append(Linear(inputLastLayer, outputLastLayer))
 
     def initialStage(self, x):
         """
@@ -114,6 +124,14 @@ class ResNet152(Module):
 
         return x
 
+    def stageLast(self, x):
+        """
+        Method to forward the last layer
+        """
+        x = flatten(x, start_dim=1)
+        x = self.lastLayer[0](x)
+        return x
+
     def forward(self, x):
         """
         Method to execute forward execution
@@ -123,18 +141,19 @@ class ResNet152(Module):
         x = self.stage2(x)
         x = self.stage3(x)
         x = self.stage4(x)
+        x = self.stageLast(x)
         return x
 
     def getNumberParams(self):
         """
-            Tool to obtain number of parameters, must be called right after calling
-            generateWeights method
+        Tool to obtain number of parameters, must be called right after calling
+        generateWeights method
         """
         return sum(p.numel() for p in self.parameters())
 
     def getParameters(self):
         """
-            Tool to obtain parameters
+        Tool to obtain parameters
         """
         parameters = []
         for p in self.parameters():
